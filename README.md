@@ -7,6 +7,10 @@ An LSPosed module for Samsung Galaxy phones. In landscape, the Good Lock
 of the camera cutout area. With this module it slides in from, and out to,
 beyond the screen edge. Where the panel stops is unchanged.
 
+| Without the module | With the module |
+| :---: | :---: |
+| ![Panel appearing next to the camera](docs/before.gif) | ![Panel sliding in from the screen edge](docs/after.gif) |
+
 ## Requirements
 
 - LSPosed with API 102 or later
