@@ -42,3 +42,7 @@ LSPosed는 적용 대상이 바뀌어도 모듈에 알려 주지 않습니다. �
 
 릴리스 빌드는 프로젝트 최상위의 `keystore.properties`(`storeFile`,
 `storePassword`, `keyAlias`, `keyPassword`)에 적은 키로 서명됩니다.
+
+## 라이선스
+
+[MIT](LICENSE)

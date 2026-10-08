@@ -43,3 +43,7 @@ takes effect after an app switch, up to about 30 seconds later.
 
 Release builds are signed with the key described in `keystore.properties` in the
 project root (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`).
+
+## License
+
+[MIT](LICENSE)
