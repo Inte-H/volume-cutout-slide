@@ -5,7 +5,7 @@
         android:description="@string/module_description">
         <provider
             android:name=".AppsProvider"
-            android:authorities="io.github.hit.volcutout.apps"
+            android:authorities="io.github.inte_h.volcutout.apps"
             android:exported="true" />
     </application>
 </manifest>

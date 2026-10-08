@@ -3,13 +3,13 @@ plugins {
 }
 
 android {
-    namespace = "io.github.hit.volcutout"
+    namespace = "io.github.inte_h.volcutout"
     compileSdk {
         version = release(37) { minorApiLevel = 1 }
     }
 
     defaultConfig {
-        applicationId = "io.github.hit.volcutout"
+        applicationId = "io.github.inte_h.volcutout"
         minSdk = 30
         targetSdk = 36
         versionCode = 5

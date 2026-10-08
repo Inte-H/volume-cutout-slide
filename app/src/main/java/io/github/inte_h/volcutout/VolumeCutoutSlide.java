@@ -1,4 +1,4 @@
-package io.github.hit.volcutout;
+package io.github.inte_h.volcutout;
 
 import android.app.Dialog;
 import android.content.Context;
