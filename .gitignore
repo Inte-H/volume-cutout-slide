@@ -19,3 +19,9 @@ build/
 /record.sh
 /run_*.sh
 /analyze.py
+/keys/
+keystore.properties
+local.properties
+.gradle/
+.kotlin/
+/module-clean/
