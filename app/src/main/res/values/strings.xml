@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Volume Cutout Slide</string>
+    <string name="module_description">In landscape, makes the camera-side volume panel slide in and out from beyond the screen edge. Applies to apps checked in this module\'s LSPosed scope and apps set to fill the camera area.</string>
+</resources>

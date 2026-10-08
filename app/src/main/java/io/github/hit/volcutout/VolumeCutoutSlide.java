@@ -3,6 +3,7 @@ package io.github.hit.volcutout;
 import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Rect;
+import android.util.Log;
 import android.view.DisplayCutout;
 import android.view.Gravity;
 import android.view.View;
@@ -10,17 +11,14 @@ import android.view.Window;
 import android.view.WindowManager;
 
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import de.robv.android.xposed.IXposedHookLoadPackage;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
-import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import io.github.libxposed.api.XposedModule;
 
-public class VolumeCutoutSlide implements IXposedHookLoadPackage {
-    private static final String TAG = "VolumeCutoutSlide: ";
+public class VolumeCutoutSlide extends XposedModule {
+    static final String TAG = "VolumeCutoutSlide";
     private static final String PANEL_TITLE = "VolumeStarStandardWindow";
     private static final String COMMAND_QUEUE = "com.android.systemui.statusbar.CommandQueue";
     private static final String APPEARANCE_REGION = "com.android.internal.view.AppearanceRegion";
@@ -38,46 +36,60 @@ public class VolumeCutoutSlide implements IXposedHookLoadPackage {
     private boolean pickedAppsTried;
 
     @Override
-    public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-        if (!"com.android.systemui".equals(lpparam.packageName)) {
+    public void onPackageReady(PackageReadyParam param) {
+        if (!AppsContract.SYSTEM_UI.equals(param.getPackageName()) || !param.isFirstPackage()) {
             return;
         }
-        ClassLoader cl = lpparam.classLoader;
+        try {
+            hookSystemUi(param.getClassLoader());
+        } catch (Throwable t) {
+            log(Log.ERROR, TAG, "hooking failed", t);
+        }
+    }
+
+    private void hookSystemUi(ClassLoader cl) throws ReflectiveOperationException {
         Class<?> regionClass = Class.forName(APPEARANCE_REGION, false, cl);
         final Method getBounds = regionClass.getMethod("getBounds");
-        XposedHelpers.findAndHookMethod(Class.forName(COMMAND_QUEUE, false, cl), "onSystemBarAttributesChanged",
+        Method barsChanged = Class.forName(COMMAND_QUEUE, false, cl).getMethod("onSystemBarAttributesChanged",
                 int.class, int.class, Class.forName("[L" + APPEARANCE_REGION + ";", false, cl), boolean.class,
-                int.class, int.class, String.class, Class.forName("[L" + LETTERBOX_DETAILS + ";", false, cl),
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        try {
-                            if ((int) param.args[0] != 0 || param.args[2] == null) {
-                                return;
-                            }
-                            foregroundPackage = (String) param.args[6];
-                            startPickedApps();
-                            Object[] regions = (Object[]) param.args[2];
-                            Rect[] bounds = new Rect[regions.length];
-                            for (int i = 0; i < regions.length; i++) {
-                                bounds[i] = new Rect((Rect) getBounds.invoke(regions[i]));
-                            }
-                            appBounds = bounds;
-                        } catch (Throwable t) {
-                            XposedBridge.log(TAG + t);
-                        }
-                    }
-                });
-        XposedHelpers.findAndHookMethod(Dialog.class, "show", new XC_MethodHook() {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam param) {
-                try {
-                    adjust(((Dialog) param.thisObject).getWindow());
-                } catch (Throwable t) {
-                    XposedBridge.log(TAG + t);
-                }
+                int.class, int.class, String.class, Class.forName("[L" + LETTERBOX_DETAILS + ";", false, cl));
+        hook(barsChanged).intercept(chain -> {
+            try {
+                onBarsChanged(chain.getArgs(), getBounds);
+            } catch (Throwable t) {
+                log(Log.WARN, TAG, "onSystemBarAttributesChanged", t);
             }
+            return chain.proceed();
         });
+        hook(Dialog.class.getMethod("show")).intercept(chain -> {
+            try {
+                adjust(((Dialog) chain.getThisObject()).getWindow());
+            } catch (Throwable t) {
+                log(Log.WARN, TAG, "Dialog.show", t);
+            }
+            return chain.proceed();
+        });
+    }
+
+    private void onBarsChanged(List<Object> args, Method getBounds) throws ReflectiveOperationException {
+        if ((int) args.get(0) != 0 || args.get(2) == null) {
+            return;
+        }
+        String pkg = (String) args.get(6);
+        boolean created = startPickedApps();
+        if (created || (pkg != null && !pkg.equals(foregroundPackage))) {
+            PickedApps picked = pickedApps;
+            if (picked != null) {
+                picked.refresh();
+            }
+        }
+        foregroundPackage = pkg;
+        Object[] regions = (Object[]) args.get(2);
+        Rect[] bounds = new Rect[regions.length];
+        for (int i = 0; i < regions.length; i++) {
+            bounds[i] = new Rect((Rect) getBounds.invoke(regions[i]));
+        }
+        appBounds = bounds;
     }
 
     // 시스템은 이 창을 카메라 영역 앞에서 끊어 배치한다. 창을 카메라 영역까지 넓히고 그 폭만큼 안쪽 여백을 줘서
@@ -106,7 +118,7 @@ public class VolumeCutoutSlide implements IXposedHookLoadPackage {
             boolean inList = picked != null && picked.contains(pkg);
             boolean covers = appCoversRightEdge(window);
             appFillsStrip = covers && (policy == CUTOUT_POLICY_FILL || inList);
-            XposedBridge.log(TAG + "pkg=" + pkg + " policy=" + policy + " picked=" + inList
+            log(Log.INFO, TAG, "pkg=" + pkg + " policy=" + policy + " picked=" + inList
                     + " coversStrip=" + covers + " apply=" + appFillsStrip);
         }
         if (appFillsStrip) {
@@ -127,30 +139,32 @@ public class VolumeCutoutSlide implements IXposedHookLoadPackage {
     }
 
     // 시스템 UI 앱 객체가 준비된 뒤에야 목록을 읽을 수 있어서, 상태 표시줄 정보가 처음 들어올 때 시작한다.
-    private void startPickedApps() {
+    private boolean startPickedApps() {
         if (pickedApps != null) {
-            return;
+            return false;
         }
         synchronized (this) {
             if (pickedAppsTried) {
-                return;
+                return false;
             }
             try {
                 Context app = (Context) Class.forName("android.app.ActivityThread")
                         .getMethod("currentApplication").invoke(null);
                 if (app == null) {
-                    return;
+                    return false;
                 }
                 pickedAppsTried = true;
-                pickedApps = new PickedApps(app);
+                pickedApps = new PickedApps(app, this);
+                return true;
             } catch (Throwable t) {
                 pickedAppsTried = true;
-                XposedBridge.log(TAG + "picked apps unavailable: " + t);
+                log(Log.WARN, TAG, "picked apps unavailable", t);
+                return false;
             }
         }
     }
 
-    private static int cutoutPolicy(String pkg) {
+    private int cutoutPolicy(String pkg) {
         if (pkg == null) {
             return -1;
         }
@@ -160,7 +174,7 @@ public class VolumeCutoutSlide implements IXposedHookLoadPackage {
             return (int) Class.forName("android.app.IActivityTaskManager")
                     .getMethod("getCutoutPolicy", int.class, String.class).invoke(atm, user, pkg);
         } catch (Throwable t) {
-            XposedBridge.log(TAG + "getCutoutPolicy: " + t);
+            log(Log.WARN, TAG, "getCutoutPolicy", t);
             return -1;
         }
     }

@@ -4,14 +4,16 @@ plugins {
 
 android {
     namespace = "io.github.hit.volcutout"
-    compileSdk = 36
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
 
     defaultConfig {
         applicationId = "io.github.hit.volcutout"
         minSdk = 30
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "2.0"
     }
 
     compileOptions {
@@ -21,5 +23,6 @@ android {
 }
 
 dependencies {
-    compileOnly("de.robv.android.xposed:api:82")
+    compileOnly("io.github.libxposed:api:102.0.0")
+    implementation("io.github.libxposed:service:102.0.0")
 }

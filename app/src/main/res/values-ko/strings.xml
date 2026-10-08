@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="module_description">가로화면에서 카메라 쪽 볼륨 패널이 화면 끝 바깥에서 들어오고 나가게 합니다. 이 모듈의 LSPosed 적용 대상에 체크한 앱과 카메라 영역을 채우도록 설정한 앱에 적용됩니다.</string>
+</resources>

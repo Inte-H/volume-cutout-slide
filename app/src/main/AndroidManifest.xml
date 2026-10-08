@@ -1,22 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-    </queries>
-    <application android:label="Volume Cutout Slide" android:hasCode="true">
-        <meta-data android:name="xposedmodule" android:value="true" />
-        <meta-data android:name="xposeddescription" android:value="가로화면에서 카메라 쪽 볼륨 패널이 화면 끝 바깥에서 들어오고 나가게 한다" />
-        <meta-data android:name="xposedminversion" android:value="93" />
-        <meta-data android:name="xposedscope" android:resource="@array/xposed_scope" />
-        <activity android:name=".AppPickerActivity" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
-            </intent-filter>
-        </activity>
+    <application
+        android:label="@string/app_name"
+        android:description="@string/module_description">
         <provider
             android:name=".AppsProvider"
             android:authorities="io.github.hit.volcutout.apps"

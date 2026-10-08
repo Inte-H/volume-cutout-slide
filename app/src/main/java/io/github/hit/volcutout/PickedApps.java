@@ -1,58 +1,75 @@
 package io.github.hit.volcutout;
 
 import android.content.Context;
-import android.database.ContentObserver;
 import android.database.Cursor;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
+import android.util.Log;
 
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import de.robv.android.xposed.XposedBridge;
+import io.github.libxposed.api.XposedInterface;
 
-// 시스템 UI 안에서 모듈 설정의 앱 목록을 캐시해 둔다.
 final class PickedApps {
+    private static final long MIN_RELOAD_INTERVAL_MS = 30_000;
+
     private final Context context;
+    private final XposedInterface xposed;
     private final Handler handler;
     private volatile Set<String> apps = Collections.emptySet();
+    private final Runnable reload = this::reloadIfStale;
+    private long lastAttemptAt = -MIN_RELOAD_INTERVAL_MS;
 
-    PickedApps(Context context) {
+    PickedApps(Context context, XposedInterface xposed) {
         this.context = context;
+        this.xposed = xposed;
         HandlerThread thread = new HandlerThread("VolumeCutoutSlide-apps");
         thread.start();
         handler = new Handler(thread.getLooper());
-        context.getContentResolver().registerContentObserver(Prefs.APPS_URI, false, new ContentObserver(handler) {
-            @Override
-            public void onChange(boolean selfChange) {
-                reload();
-            }
-        });
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                reload();
-            }
-        });
     }
 
     boolean contains(String pkg) {
         return pkg != null && apps.contains(pkg);
     }
 
-    private void reload() {
-        Set<String> loaded = new HashSet<>();
-        try (Cursor c = context.getContentResolver().query(Prefs.APPS_URI, null, null, null, null)) {
-            if (c != null) {
-                while (c.moveToNext()) {
-                    loaded.add(c.getString(0));
-                }
+    void refresh() {
+        handler.post(reload);
+    }
+
+    private void reloadIfStale() {
+        long now = SystemClock.uptimeMillis();
+        long wait = lastAttemptAt + MIN_RELOAD_INTERVAL_MS - now;
+        if (wait > 0) {
+            if (!handler.hasCallbacks(reload)) {
+                handler.postDelayed(reload, wait);
             }
-            apps = Collections.unmodifiableSet(loaded);
-            XposedBridge.log("VolumeCutoutSlide: picked apps " + apps);
+            return;
+        }
+        lastAttemptAt = now;
+        read();
+    }
+
+    private void read() {
+        Set<String> fresh = new HashSet<>();
+        try (Cursor c = context.getContentResolver().query(AppsContract.APPS_URI, null, null, null, null)) {
+            if (c == null) {
+                xposed.log(Log.WARN, VolumeCutoutSlide.TAG, "picked apps provider missing");
+                return;
+            }
+            int column = c.getColumnIndexOrThrow(AppsContract.COLUMN_PACKAGE);
+            while (c.moveToNext()) {
+                fresh.add(c.getString(column));
+            }
         } catch (Throwable t) {
-            XposedBridge.log("VolumeCutoutSlide: reading picked apps failed: " + t);
+            xposed.log(Log.WARN, VolumeCutoutSlide.TAG, "reading picked apps failed", t);
+            return;
+        }
+        if (!fresh.equals(apps)) {
+            apps = Collections.unmodifiableSet(fresh);
+            xposed.log(Log.INFO, VolumeCutoutSlide.TAG, "picked apps " + apps);
         }
     }
 }
