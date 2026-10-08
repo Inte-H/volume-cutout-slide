@@ -11,6 +11,7 @@ import android.view.Window;
 import android.view.WindowManager;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -28,6 +29,7 @@ public class VolumeCutoutSlide extends XposedModule {
 
     // 이 창을 고쳐 둔 동안만 들어 있다.
     private final Map<Window, Integer> originalCutoutModes = new WeakHashMap<>();
+    private final Map<String, String> lastLoggedDecisions = new HashMap<>();
 
     // 기본 화면에 앞에 떠 있는 앱 창들의 영역. 상태 표시줄 정보가 바뀔 때마다 새로 받는다.
     private volatile Rect[] appBounds;
@@ -118,8 +120,11 @@ public class VolumeCutoutSlide extends XposedModule {
             boolean inList = picked != null && picked.contains(pkg);
             boolean covers = appCoversRightEdge(window);
             appFillsStrip = covers && (policy == CUTOUT_POLICY_FILL || inList);
-            log(Log.INFO, TAG, "pkg=" + pkg + " policy=" + policy + " picked=" + inList
-                    + " coversStrip=" + covers + " apply=" + appFillsStrip);
+            String decision = "policy=" + policy + " picked=" + inList
+                    + " coversStrip=" + covers + " apply=" + appFillsStrip;
+            if (!decision.equals(lastLoggedDecisions.put(pkg, decision))) {
+                log(Log.INFO, TAG, "pkg=" + pkg + " " + decision);
+            }
         }
         if (appFillsStrip) {
             if (!originalCutoutModes.containsKey(window)) {
